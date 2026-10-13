@@ -1,6 +1,6 @@
 [project]
 name = "lanternkb"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local-only search over your own files, with a secret-safe ingestion layer and visibility tiers."
 readme = "README.md"
 license = "Apache-2.0"
@@ -34,7 +34,7 @@ lanternkb = "lanternkb.cli:main"
 
 [project.optional-dependencies]
 # The settings page (`lanternkb ui`), a separate package so that it costs nothing unless wanted
-ui = ["lanternkb-ui==0.1.2"]
+ui = ["lanternkb-ui==0.1.3"]
 ocr = [
     "pyobjc-framework-vision==12.2.2; sys_platform == 'darwin'",
 ]

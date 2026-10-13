@@ -1,5 +1,7 @@
 # lanternkb
 
+<!-- mcp-name: io.github.ankitb073/lanternkb -->
+
 Private, local search over your own files, for you and the AI tools you choose.
 
 lanternkb indexes the folders you pick and searches them by meaning and by exact words. It runs as a local MCP
@@ -29,6 +31,8 @@ lanternkb recent       # files changed lately
 lanternkb ui           # the settings page, with a search box
 lanternkb doctor       # checks the setup and says what to fix
 ```
+
+Run `lanternkb setup` before connecting an assistant: the server searches the folders you chose there.
 
 ## Use it from your AI tools
 

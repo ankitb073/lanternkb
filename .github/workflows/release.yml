@@ -1,4 +1,4 @@
-# Publishes lanternkb and lanternkb-ui to PyPI when a version tag (v0.1.2) is pushed. Trusted publishing:
+# Publishes lanternkb and lanternkb-ui to PyPI when a version tag (v0.1.3) is pushed. Trusted publishing:
 # no token is stored. PyPI trusts this workflow in the `pypi` environment for lanternkb and in `pypi-ui` for
 # lanternkb-ui. A manual run builds and checks without publishing.
 name: release
@@ -27,6 +27,7 @@ jobs:
           grep -qx "__version__ = \"$v\"" src/lanternkb/__init__.py
           grep -q "\"lanternkb-ui==$v\"" pyproject.toml
           grep -q "\"lanternkb==$v\"" packages/lanternkb-ui/pyproject.toml
+          if [ -f server.json ]; then test "$(python3 -c 'import json; d=json.load(open("server.json")); print(d["version"], *{p["version"] for p in d["packages"]})')" = "$v $v"; fi
       - name: The wheel ships nothing it should not
         if: hashFiles('scripts/check_wheel.py') != ''
         run: uv run --no-project --python 3.12 python scripts/check_wheel.py  # standard library only
