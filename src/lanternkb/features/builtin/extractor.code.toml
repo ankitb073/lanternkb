@@ -1,0 +1,32 @@
+[feature]
+id = "extractor.code"
+title = "Source code and configuration"
+category = "code"
+kind = "extractor"
+api_version = 1
+default_enabled = true
+default_tier = "open"
+description = "Source files, configuration files and Jupyter notebooks."
+
+[capabilities]
+reads = ["source, configuration and notebook files inside approved roots"]
+network = false
+os_permissions = []
+
+[limits]
+cpu_seconds = 30
+memory_mb = 512
+output_mb = 20
+
+[handles]
+suffixes = [".py", ".pyi", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".json", ".jsonl", ".yaml",
+            ".yml", ".toml", ".ini", ".cfg", ".conf", ".sh", ".bash", ".zsh", ".fish", ".go", ".rs",
+            ".java", ".kt", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".rb", ".php",
+            ".pl", ".lua", ".r", ".sql", ".xml", ".css", ".scss", ".ipynb", ".tf", ".hcl",
+            ".gradle", ".properties", ".dockerfile", ".vue", ".svelte", ".astro", ".dart",
+            ".scala", ".sc", ".ex", ".exs", ".erl", ".hrl", ".hs", ".clj", ".cljs", ".cljc",
+            ".edn", ".m", ".mm", ".kts", ".groovy", ".proto", ".graphql", ".gql", ".zig", ".nim",
+            ".jl", ".ps1", ".psm1", ".bat", ".cmd", ".vim", ".el", ".ml", ".mli", ".fs", ".fsx",
+            ".sol", ".less", ".sass", ".cmake", ".nix", ".jsonc", ".json5"]
+names = ["Makefile", "Dockerfile", "Justfile", "Procfile", "Rakefile", "Gemfile", "Vagrantfile",
+         "Brewfile", "Containerfile", "Jenkinsfile", "Caddyfile"]

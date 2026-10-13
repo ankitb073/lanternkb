@@ -1,0 +1,14 @@
+[feature]
+id = "embedder.bge-small"
+title = "Semantic search: BGE-small (English, small and fast)"
+category = "search"
+kind = "embedder"
+api_version = 1
+default_enabled = false
+default_tier = "open"           # vectors take the tier of the file they came from
+description = "Finds text by meaning as well as by words. BAAI/bge-small-en-v1.5, MIT. 384 dimensions, about 130 MB. Runs on this machine; the model is fetched once with `lanternkb models pull embed:bge-small`."
+
+[capabilities]
+reads = ["the redacted text of indexed chunks, in memory only"]
+network = false
+os_permissions = []

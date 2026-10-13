@@ -1,0 +1,107 @@
+[project]
+name = "lanternkb"
+version = "0.1.1"
+description = "Local-only search over your own files, with a secret-safe ingestion layer and visibility tiers."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+keywords = ["search", "mcp", "local-first", "privacy", "secrets", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Indexing",
+]
+requires-python = ">=3.12"
+authors = [{ name = "ankitb073" }]
+dependencies = [
+    "pypdfium2==5.13.0",
+    "sqlite-vec==0.1.9",
+    "tomlkit==0.15.1",
+]
+
+[project.urls]
+Source = "https://github.com/ankitb073/lanternkb"
+Issues = "https://github.com/ankitb073/lanternkb/issues"
+Documentation = "https://github.com/ankitb073/lanternkb/blob/main/docs/guide.md"
+
+[project.scripts]
+lanternkb = "lanternkb.cli:main"
+# `lanternkb-eval` comes from packages/lanternkb-dev, in a clone only
+
+[project.optional-dependencies]
+# The settings page (`lanternkb ui`), a separate package so that it costs nothing unless wanted
+ui = ["lanternkb-ui==0.1.1"]
+ocr = [
+    "pyobjc-framework-vision==12.2.2; sys_platform == 'darwin'",
+]
+audio = [
+    "mlx-whisper==0.4.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "huggingface-hub==1.33.0; sys_platform == 'darwin'",  # `lanternkb models pull`
+]
+# Semantic search. Without it lanternkb searches by keywords only. On macOS,
+# sentence-transformers and torch (they use the GPU). On Linux, ONNX Runtime:
+# torch there pulls in NVIDIA's CUDA libraries, which are not permissively licensed. ONNX
+# Runtime on macOS too: a one-off terminal search loads the ONNX exports, if pulled, in a
+# fraction of torch's time.
+embed = [
+    "numpy==2.5.3",
+    "sentence-transformers==6.1.0; sys_platform == 'darwin'",
+    "torch==2.14.0; sys_platform == 'darwin'",
+    "onnxruntime==1.30.0",
+    "tokenizers==0.23.2",
+    "huggingface-hub==1.33.0",  # `lanternkb models pull`
+]
+
+[dependency-groups]
+dev = ["lanternkb-epub", "lanternkb-ui", "mcp==2.2.0", "numpy==2.5.3", "onnxruntime==1.30.0", "tokenizers==0.23.2", "pillow==12.0.0", "pypdf==6.19.0", "pytest>=8", "ruff>=0.8"]
+# Heavy, evaluation-only dependencies. Not needed by the core.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The source archive is the code and what building it needs: no evaluation harness, tests, benchmarks or
+# docs, which live in the repo
+[tool.hatch.build.targets.sdist]
+only-include = ["src/lanternkb", "README.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
+exclude = ["src/lanternkb/eval"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lanternkb"]
+# The evaluation harness works only in a clone, and its fake-secret generators would trip a
+# user's secret scanner: it stays out of the wheel
+exclude = ["src/lanternkb/eval"]
+
+[tool.uv]
+default-groups = ["dev"]
+# uv's own Python builds: their sqlite3 can load extensions, which moving an index's vectors
+# from before version 7 needs (sqlite-vec). python.org's macOS build cannot.
+python-preference = "only-managed"
+
+# The settings UI is a separate, optional package, developed alongside.
+[tool.uv.workspace]
+members = ["packages/lanternkb-ui", "packages/lanternkb-epub"]
+
+[tool.uv.sources]
+lanternkb-ui = { workspace = true }
+lanternkb-epub = { workspace = true }  # the example plugin
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["SIM905"]  # word lists read better as split strings
+
+[tool.ruff.lint.per-file-ignores]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/lanternkb-epub/tests"]
+pythonpath = ["tests"]
+markers = ["slow: needs downloaded models, installed tools or minutes (run with -m slow)"]
+addopts = "-m 'not slow'"

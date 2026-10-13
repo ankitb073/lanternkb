@@ -1,0 +1,14 @@
+[feature]
+id = "embedder.embeddinggemma-300m"
+title = "Semantic search: EmbeddingGemma 300M"
+category = "search"
+kind = "embedder"
+api_version = 1
+default_enabled = true          # chosen on dev in phase 5
+default_tier = "open"           # vectors take the tier of the file they came from
+description = "Finds text by meaning as well as by words. Google's EmbeddingGemma (Unsloth's ungated copy), Gemma terms. 768 dimensions, about 1.2 GB. Runs on this machine; the model is fetched once with `lanternkb models pull embed:embeddinggemma-300m`."
+
+[capabilities]
+reads = ["the redacted text of indexed chunks, in memory only"]
+network = false
+os_permissions = []

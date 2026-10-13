@@ -1,0 +1,14 @@
+[feature]
+id = "reranker.gte-modernbert"
+title = "Reranking: gte-reranker ModernBERT"
+category = "search"
+kind = "reranker"
+api_version = 1
+default_enabled = true          # the third blind test
+default_tier = "open"           # it reorders results; it stores nothing
+description = "Reorders the top 20 results with a cross-encoder that reads each one's best passage next to the query. Alibaba's gte-reranker-modernbert-base, Apache-2.0, about 0.6 GB, fetched once with `lanternkb models pull rerank:gte-modernbert`. Runs on this machine. On macOS (the GPU) it adds about 0.1 s per search. Where it runs on the CPU (Linux) it adds 0.4 to 1 s, so there it waits until you switch it on yourself."
+
+[capabilities]
+reads = ["the redacted text of the top results, in memory only"]
+network = false
+os_permissions = []

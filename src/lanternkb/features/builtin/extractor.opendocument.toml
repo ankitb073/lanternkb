@@ -1,0 +1,23 @@
+[feature]
+id = "extractor.opendocument"
+title = "OpenDocument (LibreOffice)"
+category = "documents"
+kind = "extractor"
+api_version = 1
+default_enabled = true
+default_tier = "open"           # the root's tier decides; this does not restrict further
+version = 2                     # 2: comments, cells, text boxes
+description = "OpenDocument text (.odt), spreadsheets (.ods) and presentations (.odp), as LibreOffice, OpenOffice and Collabora save them: body text with headers, footers, footnotes and comments; sheet rows; slides with notes. Password-protected documents are skipped."
+
+[capabilities]
+reads = ["OpenDocument files inside approved roots"]
+network = false
+os_permissions = []
+
+[limits]
+cpu_seconds = 60
+memory_mb = 768
+output_mb = 20
+
+[handles]
+suffixes = [".odt", ".ods", ".odp", ".ott", ".ots", ".otp"]

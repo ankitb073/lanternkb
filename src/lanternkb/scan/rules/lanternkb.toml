@@ -1,0 +1,852 @@
+# lanternkb's own rules, in gitleaks format. Loaded after gitleaks.toml;
+# a rule here with the same id replaces the gitleaks one. `action` is our extension:
+# "redact" (default) or "skip-file".
+#
+# Shared allowlist ideas: documentation examples ("example"), masked values ("[secure]",
+# "****"), template and environment references (${X}, {{ x }}, %X%, <x>), and placeholders.
+
+[[rules]]
+id = "url-credentials"
+description = "Password inside a URL (database, message broker, HTTP basic auth); the user name may be empty."
+regex = '''(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:@/"'`<>]{0,64}:([^\s@/"'`<>]{3,128})@[^\s/"'`<>]{1,255}'''
+keywords = ["://"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password|passwd|pass|pwd|secret|changeme|test|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^\[[^\]]*\]$''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^%[A-Za-z_]+%$''',
+    '''^\{\{.*\}\}$''',
+    '''^\{[A-Za-z_][A-Za-z0-9_.\[\]'"]*(?:![rsa])?(?::[^}]*)?\}$''',
+]
+
+[[rules]]
+id = "authorization-header"
+description = "Credential in an Authorization header (Bearer, Token, Basic, Digest)."
+regex = '''(?i)\bauthori[sz]ation\\?["']?\s*[:=]\s*\\?["']?(?:bearer|token|basic|digest)\s+([A-Za-z0-9._~+/=:-]{12,})'''
+keywords = ["authorization", "authorisation"]
+entropy = 3.0
+[[rules.allowlists]]
+regexes = [
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''(?i)^(?:x+|<.*>|your[_-].*|token)$''',
+    '''(?i)example''',
+    # Basic credentials that decode to well-known documentation placeholders:
+    # username:password, user:password, user:pass, admin:admin, admin:password, test:test,
+    # foo:bar, user:secret
+    '''^(?:dXNlcm5hbWU6cGFzc3dvcmQ=|dXNlcjpwYXNzd29yZA==|dXNlcjpwYXNz|YWRtaW46YWRtaW4=|YWRtaW46cGFzc3dvcmQ=|dGVzdDp0ZXN0|Zm9vOmJhcg==|dXNlcjpzZWNyZXQ=)$''',
+]
+
+[[rules]]
+id = "password-assignment"
+description = "A quoted password assigned in code or configuration (quotes may be escaped, as inside JSON strings)."
+regex = '''(?i)[\w.-]{0,40}(?:passw(?:or)?d|pwd|passphrase)[\w.-]{0,40}\\?["']?\s{0,5}(?:=|:|:=|=>)\s{0,5}\\?["']([^"'\s\\]{6,128})\\?["']'''
+keywords = ["passw", "pwd", "passphrase"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^%\(?[A-Za-z_]+\)?s?%?$''',
+    '''^\{\{.*\}\}$''',
+    '''^\{[A-Za-z_][A-Za-z0-9_.\[\]'"]*(?:![rsa])?(?::[^}]*)?\}$''',
+    '''(?i)^your[_-]''',
+    '''^\$\{[^}]{1,100}\}$''',  # a reference with a default: ${SMTP_PASSWORD:}, ${localEnv:DB_PASSWORD}
+    '''^/(?:[\w.-]+/)+[\w.-]+$''',  # a path: /run/secrets/db_password
+    '''^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$''',  # a timestamp: password_changed_at
+    '''#\{|\$\{|\{\{''',  # interpolation: "wrong-#{password}"
+    '''^[a-z_]+(?:\.[a-z_]+){2,}$''',  # a message key: password.expired.title
+    '''^(?=[a-z_]*(?:password|passwd|pwd|secret|token))[a-z]+(?:_[a-z]+)+$''',  # a key name: password_hint_shown
+    '''^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:PASSWORD|PASSWD|PWD|PASS|SECRET|TOKEN|KEY)(?:_[A-Z0-9]+)*$''',  # an environment variable's name: REPO_PASSWORD
+    '''(?i)^(?:passwort|kennwort|mot de passe|contrase(?:ñ|n)a|senha|wachtwoord|l(?:ö|o)senord|salasana|has(?:ł|l)o|heslo|(?:ş|s)ifre|parola|пароль|パスワード|密码|密碼|비밀번호)$''',  # the word itself, translated
+]
+
+[[rules]]
+id = "password-assignment-unquoted"
+description = "An unquoted password in configuration (INI, YAML, env lists): must mix letters with digits or symbols."
+regex = '''(?im)^[ \t-]{0,40}[\w.-]{0,40}(?:passw(?:or)?d|pwd|passphrase)[\w.-]{0,40}[ \t]{0,5}[:=][ \t]{0,5}((?=[^\s#;"'`]*[A-Za-z])(?=[^\s#;"'`]*[0-9!@#$%^&*+=?~])[^\s#;"'`,]{6,128})[ \t]*$'''
+keywords = ["passw", "pwd", "passphrase"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)example''',
+    '''\(''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''^\{[A-Za-z_][A-Za-z0-9_.\[\]'"]*(?:![rsa])?(?::[^}]*)?\}$''',
+    '''^%[A-Za-z_]+%$''',
+    '''^<[^>]*>$''',
+    '''(?i)^(?:self|os|config|settings|env|args|kwargs|request|params|options)\.''',
+    '''^\$\{[^}]{1,100}\}$''',  # a reference with a default: ${SMTP_PASSWORD:}, ${localEnv:DB_PASSWORD}
+    '''^/(?:[\w.-]+/)+[\w.-]+$''',  # a path: /run/secrets/db_password
+    '''^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$''',  # a timestamp: password_changed_at
+    '''#\{|\$\{|\{\{''',  # interpolation: "wrong-#{password}"
+    '''^[a-z_]+(?:\.[a-z_]+){2,}$''',  # a message key: password.expired.title
+    '''^(?=[a-z_]*(?:password|passwd|pwd|secret|token))[a-z]+(?:_[a-z]+)+$''',  # a key name: password_hint_shown
+    '''^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:PASSWORD|PASSWD|PWD|PASS|SECRET|TOKEN|KEY)(?:_[A-Z0-9]+)*$''',  # an environment variable's name: REPO_PASSWORD
+    '''(?i)^(?:passwort|kennwort|mot de passe|contrase(?:ñ|n)a|senha|wachtwoord|l(?:ö|o)senord|salasana|has(?:ł|l)o|heslo|(?:ş|s)ifre|parola|пароль|パスワード|密码|密碼|비밀번호)$''',  # the word itself, translated
+]
+
+[[rules]]
+id = "password-in-prose"
+description = "A password written in a note (\"the wifi password is ...\"): must mix letters with digits or symbols."
+regex = '''(?i)\bpass(?:word|phrase|code)\s+(?:is|was|now|->|:)\s*:?\s*["'`]?((?=[^\s"'`]*[A-Za-z])(?=[^\s"'`]*[0-9!@#$%^&*+=?~])[^\s"'`<>,;]{6,64})'''
+keywords = ["password", "passphrase", "passcode"]
+[[rules.allowlists]]
+regexes = ['''(?i)example''', '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''', '''^<[^>]*>$''', '''(?i)^(?:required|optional|incorrect|invalid|wrong|reset|changed)''']
+
+[[rules]]
+id = "basic-auth-cli"
+description = "user:password given on a command line (curl -u, --user)."
+regex = '''(?:\s-u|--user)[ =]?["']?[^\s:"'$]{1,64}:([^\s"']{3,128})["']?'''
+keywords = ["-u ", "--user", "-u\t", "-u="]
+[[rules.allowlists]]
+regexes = ['''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''', '''(?i)example''', '''(?i)^(?:password|pass|secret|xxx+)$''']
+
+[[rules]]
+id = "telegram-bot-token-bare"
+description = "Telegram bot token by its shape (bot id, colon, 35-character key), with or without a keyword."
+regex = '''\b(\d{8,10}:[A-Za-z0-9_-]{35})(?:[^A-Za-z0-9_-]|$)'''
+keywords = [":"]
+entropy = 3.5
+
+[[rules]]
+id = "discord-bot-token-bare"
+description = "Discord bot token by its shape (three base64url parts), with or without a keyword."
+regex = '''\b([MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,40})\b'''
+keywords = ["."]
+entropy = 4.0
+
+[[rules]]
+id = "sql-password"
+description = "Password in SQL (CREATE/ALTER USER ... PASSWORD or IDENTIFIED BY)."
+regex = '''(?i)\b(?:identified\s+by|(?:create|alter)\s+(?:user|role)\b[^;]{0,200}?\bpassword)\s+'([^'\s]{4,128})\''''
+keywords = ["identified", "password"]
+[[rules.allowlists]]
+regexes = ['''(?i)^(?:password|changeme|example|secret|xxx+|\*+)$''']
+
+[[rules]]
+id = "azure-storage-account-key"
+description = "Azure storage account key in a connection string."
+regex = '''(?i)AccountKey\s*=\s*([A-Za-z0-9+/]{86}==)'''
+keywords = ["accountkey"]
+
+[[rules]]
+id = "service-account-key-file"
+description = "Cloud service-account key file (JSON with an embedded private key): the whole file is skipped."
+regex = '''\\?"type\\?"\s*:\s*\\?"service_account\\?"'''
+keywords = ["service_account"]
+action = "skip-file"
+
+[[rules]]
+id = "private-key-header"
+description = "A private-key block without its END line (a truncated paste): the whole file is skipped."
+regex = '''-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=]{40,}'''
+keywords = ["private key"]
+action = "skip-file"
+
+[[rules]]
+id = "putty-private-key"
+description = "PuTTY private key file content: the whole file is skipped."
+regex = '''PuTTY-User-Key-File-\d+:'''
+keywords = ["putty-user-key-file"]
+action = "skip-file"
+
+[[rules]]
+id = "xml-secret-element"
+description = "A secret in an XML element (Maven settings, app configs): <password>, <secret>, <token>, <apiKey>."
+regex = '''(?i)<(?:[\w-]{0,30}:)?(?:password|passwd|passphrase|secret|client[_-]?secret|token|access[_-]?token|api[_-]?key)>\s{0,5}([^<\s]{4,256})\s{0,5}</'''
+keywords = ["password>", "passwd>", "passphrase>", "secret>", "token>", "apikey>", "api_key>", "api-key>"]
+[[rules.allowlists]]
+regexes = ['''(?i)example''', '''^\$\{[^}]+\}$''', '''^\{\{.*\}\}$''', '''(?i)^(?:password|secret|changeme|xxx+|\*+)$''']
+
+[[rules]]
+id = "php-define-secret"
+description = "A secret in a PHP define(), as in wp-config.php: define('DB_PASSWORD', '...')."
+regex = '''(?i)define\(\s{0,5}['"][A-Z0-9_]{0,40}(?:PASSWORD|SECRET|_KEY|_SALT|TOKEN)[A-Z0-9_]{0,40}['"]\s{0,5},\s{0,5}['"]([^'"]{4,256})['"]'''
+keywords = ["define("]
+[[rules.allowlists]]
+regexes = ['''(?i)example''', '''(?i)^(?:put your unique phrase here|password|secret|changeme|xxx+)$''']
+
+# -- 2026-10-03: shapes the phase 2 test set missed (development data only: dev and the
+# spent phase 2 test split; scored once on a new held-out split, bench/secrets2-plan.md).
+
+[[rules]]
+id = "password-assignment-typed"
+description = "A quoted password assigned with a type annotation (Python `password: str = '...'`, Rust `const PASSPHRASE: &str = \"...\"`), from a map (`ENV['PASSWORD']`), or with `||=` (Ruby)."
+regex = '''(?i)[\w.-]{0,40}(?:passw(?:or)?d|pwd|passphrase)[\w.-]{0,40}(?:\\?["']\]|(?=\s{0,3}:\s{0,3}&?[A-Za-z_])|(?=\s{0,5}\|\|=))\s{0,5}(?::\s{0,3}&?[A-Za-z_][\w\[\]., ]{0,30}?\s{0,3}(?==))?(?:=|\|\|=)\s{0,5}\\?["']([^"'\s\\]{6,128})\\?["']'''
+keywords = ["passw", "pwd", "passphrase"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''^[A-Z][A-Z]*(?:_[A-Z]+)+$''',  # an environment variable's name
+    '''^/(?:[a-z][a-z0-9._-]*/)+[a-z][a-z0-9._-]*$''',  # a path, such as /run/secrets/db
+]
+
+[[rules]]
+id = "powershell-securestring"
+description = "A password turned into a SecureString from plain text in PowerShell."
+regex = '''(?i)\bConvertTo-SecureString\s+(?:-String\s+)?["']([^"'\s]{6,128})["']\s+-AsPlainText'''
+keywords = ["convertto-securestring"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+]
+
+[[rules]]
+id = "sql-password-literal"
+description = "A password given to SQL (CREATE USER ... PASSWORD '...', IDENTIFIED BY '...', OPTIONS (password '...'))."
+regex = '''(?i)\b(?:password|identified\s+by)\s+'((?=[^'\s]{0,127}[0-9!@#$%^&*+=?~]|(?-i:[^'\sa-z]{0,127}[a-z][^'\sA-Z]{0,126}[A-Z])|[^'\s]{10})[^'\s]{6,128})''''
+keywords = ["password", "identified"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+]
+
+[[rules]]
+id = "cli-password-flag"
+description = "A password on a command line: mysql -p<password> (no space), or --password=<value>."
+regex = '''(?:(?i:\bmysql(?:dump|admin|import)?)\b[^\n|;&]{0,200}?\s-p['"]?((?=[^\s'"]*[A-Za-z0-9])[^\s'"-][^\s'"]{3,127})|(?i:--password)(?:=|[ \t]+)['"]?([^\s'"]{6,128}))'''
+keywords = ["mysql", "--password"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:prompt|stdin|ask|none|env|file|keyring|string|option|value|text|arg)$''',  # a mode or a usage word, not a value
+    '''^\[.*\]$''',  # usage text: --password [password]
+    '''^[A-Z][A-Z]*(?:_[A-Z]+)+$''',  # an environment variable's name
+]
+
+[[rules]]
+id = "bearer-token"
+description = "A bearer token anywhere (JSON exports, HAR files, Postman collections, notes), not only after an Authorization header."
+regex = '''\b[Bb]earer\s+((?=[A-Za-z0-9\-._~+/]{0,1000}[0-9])[A-Za-z0-9\-._~+/]{20,}=*)'''
+keywords = ["bearer"]
+entropy = 3.5
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+]
+
+[[rules]]
+id = "pasted-secret"
+description = "A token pasted in a chat or a note after a hand-off phrase (\"here you go: ...\", \"new one: ...\"): must mix letters and digits."
+regex = '''(?i)\b(?:here you go|here it is|try this(?: one)?|new one|use this(?: one)?|(?:key|token|password|passphrase|secret) is now|pasted (?:the |my )?(?:key|token|password|secret|credentials?)[^:\n]{0,40})\s{0,3}:?\s{0,3}[`"']?((?=[^\s`"']*[A-Za-z])(?=[^\s`"']*[0-9])[A-Za-z0-9!@#$%^&*+=?~._/\-]{10,128})'''
+keywords = ["here you go", "here it is", "try this", "new one", "use this", "is now", "pasted"]
+entropy = 3.0
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)\.(?:pdf|docx?|xlsx?|pptx?|odt|ods|csv|tsv|txt|md|json|ya?ml|xml|html?|log|zip|tar|t?gz|bz2|xz|7z|rar|png|jpe?g|gif|svg|webp|heic|mp[34]|mov|wav|m4a|dmg|pkg|exe|msi|deb|rpm|iso|apk|ipa|whl|jar|py|js|ts|sh|key|eml|msg|toml|ini|cfg|conf|diff|patch|sql|bak|ics|vcf|rtf|epub|pages|numbers|psd|ai|sketch|fig|avi|mkv|flac|ogg|ttf|otf|woff2?)$''',  # a file name: report_2026_Q3.pdf
+    '''^v?\d+(?:\.\d+)+(?:[-+.][A-Za-z0-9.]+)?$''',  # a version: v2.14.0-rc3
+    '''^[A-Z]{2,10}-\d{1,6}$|^[A-Z]{2,6}-\d{4}-\d{3,6}$''',  # a ticket or invoice number: INV-2026-00417
+]
+
+# -- 2026-10-03, second round: credential files whose password has no `=` or `:`,
+# and key-value pairs split across XML elements or attributes. Developed on dev and the
+# spent test and test2 splits.
+
+[[rules]]
+id = "netrc-password"
+description = "A password in .netrc, .msmtprc or similar files: `login <user> password <secret>`, or `password <secret>` alone on a line."
+regex = '''(?im)(?:\b(?:login|account|user)[ \t]+\S+[ \t]+password|^[ \t]*password)[ \t]+((?!["'$])(?=[^\s#]*[0-9!@#$%^&*+=?~])[^\s#"']{6,128})'''
+keywords = ["password"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+]
+
+[[rules]]
+id = "pgpass-line"
+description = "A PostgreSQL .pgpass line: host:port:database:user:password."
+regex = '''(?m)^[A-Za-z0-9._*\-]+:(?:\d{2,5}|\*):[^:\s#]+:[^:\s]+:([^\s:]{6,128})[ \t]*$'''
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+]
+
+[[rules]]
+id = "plist-secret"
+description = "A secret in a property list: <key>…password/secret/token…</key> then <string>value</string>."
+regex = '''(?i)<key>[^<]{0,40}(?:passw(?:or)?d|secret|token|api[_ ]?key|jwt|credential)[^<]{0,40}</key>\s{0,20}<string>([^<\s]{8,512})</string>'''
+keywords = ["<key>"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+]
+
+[[rules]]
+id = "xml-named-secret"
+description = "An XML attribute pair naming a secret: name=\"…SECRET/TOKEN/PASSWORD/KEY…\" value=\"…\" (IDE run configs, .NET settings)."
+regex = '''(?i)\b(?:name|key)\s{0,3}=\s{0,3}"[^"]{0,60}(?:secret|token|passw(?:or)?d|api[_-]?key|access[_-]?key|credential)[^"]{0,60}"\s{1,10}value\s{0,3}=\s{0,3}"([^"\s]{8,512})"'''
+keywords = ["value"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+]
+
+# -- authenticator seeds
+
+[[rules]]
+id = "otpauth-secret"
+description = "A TOTP or HOTP seed in an otpauth:// URI (authenticator exports, QR code text)."
+regex = '''(?i)otpauth://[th]otp/[^\s?]{0,200}\?(?:[^\s#&]{0,200}&){0,10}secret=([A-Z2-7]{16,128}=*)'''
+keywords = ["otpauth://"]
+[[rules.allowlists]]
+regexes = ['''^JBSWY3DPEHPK3PXP$''']  # the documentation example
+
+# -- password-manager exports that store label and value pairs
+
+[[rules]]
+id = "roboform-password-field"
+description = "A password in RoboForm's RfFieldsV2 column: `Password$,,,pwd,<value>`."
+regex = '''(?i)\b(?:password|passwd|pwd|pass)\$?,,,pwd,([^",\n]{4,256})'''
+keywords = ["pwd,"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''(?i)^(?:required|optional|none|n/?a|same|see|unchanged|reset|expired|unknown|blank|empty|hidden|prompt)\.?$''',
+]
+
+[[rules]]
+id = "export-password-line"
+description = "A `Password: value` line after a login or URL line, in a password manager's CSV or text export (LastPass and Zoho Vault notes, Kaspersky text export). The value runs to the end of the line, so passphrases with spaces are whole."
+regex = '''(?im)(?:^|")[ \t]{0,4}(?:login|user(?: ?name)?|user ?id|e-?mail|url|website|account|host(?: ?name)?|server)[ \t]{0,3}:[^\n]{0,200}\n(?:[^\n]{0,200}\n){0,3}?[ \t]{0,4}(?:password|passwd|pwd|passcode|passphrase|pin)[ \t]{0,3}:[ \t]{0,3}([^\s"\\][^\n"\\]{2,125}[^\s"\\])'''
+path = '''(?i)\.(?:csv|tsv|txt)$'''
+keywords = ["password", "passwd", "pwd", "passcode", "passphrase", "pin"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''(?i)^(?:required|optional|none|n/?a|same|see|unchanged|reset|expired|unknown|blank|empty|hidden|prompt)\.?$''',
+    '''^[_•*·●.-]+$''',  # a form's blank, or a masked value
+    '''(?i)^(?:password|passwort|kennwort|mot de passe|contrase(?:ñ|n)a|senha|wachtwoord|l(?:ö|o)senord|salasana|has(?:ł|l)o|parol(?:a|ă)?|heslo|(?:ş|s)ifre|пароль|パスワード|密码|密碼|비밀번호)$''',  # the word itself, translated
+]
+
+[[rules]]
+id = "keepass-xml-password"
+description = "A password in a KeePass 2 XML export: <Key>Password</Key> then <Value>…</Value>."
+regex = '''(?i)<Key>\s{0,5}Password\s{0,5}</Key>\s{0,20}<Value[^>]{0,80}>([^<]{4,512})</Value>'''
+keywords = ["<key>"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''(?i)^(?:required|optional|none|n/?a|same|see|unchanged|reset|expired|unknown|blank|empty|hidden|prompt)\.?$''',
+]
+
+[[rules]]
+id = "json-password-field"
+description = "A password in a JSON field list (Enpass, 1Password 1PIF, Bitwarden custom fields): a label naming a password next to its value, in either order."
+regex = '''(?i)"(?:label|name|title|designation|fieldName)"\s{0,3}:\s{0,3}"(?:password|passwd|pwd|passphrase)"\s{0,3},\s{0,3}(?:"\w{1,20}"\s{0,3}:\s{0,3}(?:"[^"\n]{0,80}"|[\w.-]{1,20})\s{0,3},\s{0,3}){0,4}"(?:value|v)"\s{0,3}:\s{0,3}"([^"\n]{4,512})"|"(?:value|v)"\s{0,3}:\s{0,3}"([^"\n]{4,512})"\s{0,3},\s{0,3}(?:"\w{1,20}"\s{0,3}:\s{0,3}(?:"[^"\n]{0,80}"|[\w.-]{1,20})\s{0,3},\s{0,3}){0,4}"(?:label|name|title|designation|fieldName)"\s{0,3}:\s{0,3}"(?:password|passwd|pwd|passphrase)"'''
+keywords = ["password", "passwd", "pwd", "passphrase"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''(?i)^(?:required|optional|none|n/?a|same|see|unchanged|reset|expired|unknown|blank|empty|hidden|prompt)\.?$''',
+    '''^[_•*·●.-]+$''',  # a form's blank, or a masked value
+    '''(?i)^(?:password|passwort|kennwort|mot de passe|contrase(?:ñ|n)a|senha|wachtwoord|l(?:ö|o)senord|salasana|has(?:ł|l)o|parol(?:a|ă)?|heslo|(?:ş|s)ifre|пароль|パスワード|密码|密碼|비밀번호)$''',  # the word itself, translated
+]
+
+# -- identifiers that generic-api-key (vendored) took for keys in the
+# blind clean corpus of the third held-out test. Recall unchanged on every spent split.
+
+[[allowlists]]
+description = "Pagination cursors and identifier fields: not credentials."
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+regexes = [
+    '''(?i)(?:page|next_page|prev_page|continuation|pagination)[_-]?(?:token|cursor)''',
+    '''(?i)(?:idempotency|request|trace|span|correlation|event|token|session|transaction)[_-]?(?:key|id)\b''',
+]
+
+[[allowlists]]
+description = "In a CSV, a prose or event-name cell before a comma is not a key name."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+regexes = ['''^[^,=:]*[ .][^,=:]*,''']
+paths = ['''(?i)\.(?:csv|tsv)$''']
+
+# -- 2026-10-03, round 3: a candidate, off by default (scan.rules.ROUND3)
+
+[[rules]]
+id = "registry-login-password"
+description = "A password for a container registry on a command line: `--creds user:pass` (skopeo, podman, buildah) or `docker login -p pass`."
+regex = '''(?i)(?:--(?:dest-|src-)?creds|--registry-creds)[= ]['"]?[^\s:'"]{1,100}:([^\s'"]{4,128})|\b(?:docker|podman|nerdctl|helm\s+registry)\s+login\b(?:(?!\b(?:docker|podman|nerdctl|helm|run|exec|push|pull|then|and|with)\b)(?!\.(?:\s|$))[^\n|;&,]){0,200}?\s(?:-p|--password)[= ]?['"]?((?![\d:]+(?:/[a-z]+)?(?:\s|$))[^\s'"-][^\s'"]{3,127})'''
+keywords = ["creds", "login"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''^(?:\$\(|`|@)''',  # a command substitution or a file, not the value
+]
+
+[[rules]]
+id = "service-password-directive"
+description = "A password set by a server's configuration directive: Redis `requirepass` and `masterauth`, a Redis ACL `user <name> on >password`, HAProxy `insecure-password`."
+regex = '''(?im)^[ \t]*(?:(?:requirepass|masterauth|masterpassword)[ \t]+["']?([^\s"']{4,128})|user[ \t]+\S{1,64}[ \t]+insecure-password[ \t]+([^\s#]{4,128})|user[ \t]+\S{1,64}[ \t]+(?:on|off)\b(?=[^\n]*\s(?:~\S|&\S|[+-]@?[a-z]|allkeys|allcommands|nopass|resetpass))[^\n>]{0,200}[ \t]>((?!/)[^\s#]{4,128}))'''
+keywords = ["requirepass", "masterauth", "masterpassword", "insecure-password", ">"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{.*\}\}$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+]
+
+# -- 2026-10-03, round 4: a candidate, off by default (scan.rules.ROUND4)
+
+[[rules]]
+id = "python-auth-tuple"
+description = "A password in a Python HTTP auth tuple or helper: `auth=('user', 'password')`, `HTTPBasicAuth('user', 'password')`, `BasicAuth('user', 'password')`."
+regex = '''(?:\bauth\s*=\s*\(|\b(?:HTTPBasicAuth|HTTPDigestAuth|BasicAuth|DigestAuth)\s*\()\s*['"][^'"\n]{1,100}['"]\s*,\s*(?:password\s*=\s*)?['"]((?=[^'"\n]*[0-9!@#$%^&*+=?~])[^'"\n]{6,128})['"]'''
+keywords = ["auth"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{?.*\}\}?$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:replace[_-]?me|change[_-]?me|fill[_-]?me[_-]?in|todo|tbd|fixme)$''',
+    '''^[a-z]+(?:_[a-z]+)+$''',  # an identifier: `client_secret`, `api_key_header`
+    '''^(?:%\(\w+\)s|%s|\{\w*\})$''',  # a format placeholder: `%(password)s`, `{pw}`
+]
+
+[[rules]]
+id = "terraform-secret-variable"
+description = "A Terraform variable whose name says it is secret, with a literal default: `variable \"db_password\" { default = \"...\" }`."
+regex = '''(?i)\bvariable\s+"[^"\n]{0,60}(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|private[_-]?key|cred(?:ential)?s?)[^"\n]{0,60}"\s*\{[^{}]{0,300}?\bdefault\s*=\s*"((?=[^"\s]*[A-Za-z0-9+/]{16})(?=[^"\s]*[0-9])[^"\s$]{16,256})"'''
+keywords = ["variable"]
+path = '''(?i)\.(?:tf|tfvars|hcl)$'''
+[[rules.allowlists]]
+regexes = [
+    '''(?i)example|changeme|placeholder|replace[_-]?me|your[_-]''',
+    '''^<[^>]*>$''',
+    '''^(?:x+|\*+|\.+)$''',
+    '''^(?:~|\.{0,2}/|arn:|alias/|projects/|secret/|kv/)|://''',  # a path, a reference, a URL
+    '''^[a-z0-9_.-]+(?:/[a-z0-9_.-]+)+$''',  # a lower-case path: `prod/db-credentials-2026`
+    '''^(?:[a-z0-9-]+\.)+[a-z]{2,}$''',  # a host name
+]
+
+[[rules]]
+id = "ansible-inventory-password"
+description = "A password given to Ansible as a host or group variable: `ansible_become_pass=...`, `ansible_ssh_pass=...`, `ansible_password: ...`."
+regex = '''\bansible_(?:become_|ssh_|sudo_|su_)?pass(?:word)?\s*[=:]\s*['"]?((?:[^\s'"{!<$%]|![^\sv])[^\s'"]{3,127})'''
+keywords = ["ansible_"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''(?i)^your[_-]''',
+    '''(?i)^(?:todo|tbd|fixme|replace[_-]?me|change[_-]?me|secret|vault[_-].*)$''',
+    '''^[a-z]+(?:_[a-z0-9]+)+$''',  # an identifier: `token_file`, `worker_v3`
+]
+
+# -- 2026-10-07, round 5: a candidate, off by default (scan.rules.ROUND5)
+
+[[rules]]
+id = "windows-credential-cli"
+description = "A password on a Windows command line: `cmdkey /add:host /user:name /pass:secret`, or `net use \\\\server\\share secret /user:name`."
+regex = '''(?i)\bcmdkey\b[^\n]{0,200}?/pass:"?([^\s"]{4,128})|\bnet\s+use\s+(?:[A-Za-z]:\s+)?\\\\\S{1,200}\s+(?!/|\*)([^\s"/\\]{4,128})\s+/user:'''
+keywords = ["cmdkey", "net use"]
+[[rules.allowlists]]
+regexes = [
+    '''^%[A-Za-z_][A-Za-z0-9_]*%$''',
+    '''^\$[A-Za-z_]''',
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|xxx+|\*+)$''',
+    '''^<[^>]*>$''',
+]
+
+[[rules]]
+id = "setx-secret"
+description = "A secret stored in an environment variable from a Windows batch file: `setx DB_PASSWORD value` or `set API_TOKEN=value`."
+regex = '''(?im)^[ \t@]*(?:setx|set)[ \t]+"?[A-Za-z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|PWD|CREDENTIAL|API_?KEY)[A-Za-z0-9_]*(?:[ \t]+|=)"?((?=[^\s"]*\d)(?=[^\s"]*[A-Za-z])[^\s"]{6,256})'''
+keywords = ["setx", "set "]
+path = '''(?i)\.(?:bat|cmd)$'''
+[[rules.allowlists]]
+regexes = [
+    '''^%[A-Za-z_][A-Za-z0-9_~:,-]*%$''',
+    '''^!\w+!$''',
+    '''(?i)^(?:changeme|example|placeholder|xxx+|\*+|/m|/k)$''',
+    '''^<[^>]*>$''',
+    '''^(?:[A-Za-z]:\\|\\\\|/|~|\.\\|https?://)''',  # a path or a URL
+]
+
+[[rules]]
+id = "password-after-words"
+description = "A password given in prose after a few words: `db password: …`, `the wifi password is …`, `Login Secret: …`. The value must hold a letter and a digit."
+regex = '''(?i)(?<![\w$.-])(?:[a-z][\w-]{0,20}[ \t]){1,3}(?:password|passwd|passphrase|passcode|secret)[ \t]*(?::|=|[ \t]is)[ \t]*["'`]?((?=[^\s"'`]*\d)(?=[^\s"'`]*[A-Za-z])[^\s"'`]{6,128})'''
+keywords = ["password", "passwd", "passphrase", "passcode", "secret"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret\d*|test\d*|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder''',
+    '''^<[^>]*>$''',
+    '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^%\(?\w+\)?s?%?$''',
+    '''(?i)^(?:v?\d+(?:\.\d+)+|\d+(?:st|nd|rd|th|px|ms|s|min|h|d|mb|gb|kb|%)?)$''',
+    '''(?i)^(?:https?://|/|~/|\./)''',
+    '''^[a-z]+(?:_[a-z0-9]+)+$''',
+    '''^[a-z0-9_-]+(?:/[a-z0-9_.@-]+)+$''',  # a lower-case path or reference: kv/data/app
+]
+# After `secret` (not `password`), a value shaped like a name is a resource's name: a
+# lower-case name, an upper-case constant, an algorithm (`summer2024` after
+# `password` is a password)
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i:secret)[ \t]*(?::|=|[ \t]is)[ \t]*["'`]?(?:[a-z]+(?:-[a-z]+)*-?\d{0,4}|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+|(?:HMAC|SHA|AES|RSA|ECDSA|ED25519|PBKDF2|BCRYPT|ARGON2)[A-Za-z0-9-]*|\S+-(?:hashed|enabled|disabled|encrypted|rotated))$''',
+]
+
+# -- Round 6 (2026-10-08): candidates, off unless enabled (`scan.rules.ROUND6`). Formats the
+# spent splits showed missing through the pipeline: `aws configure` transcripts, database
+# connection strings, exported variables, Wi-Fi passphrases, cloud-init passwords, XML
+# name/value settings (IDE run configs, Android resources, .NET app.config), LaTeX macros
+# and Helm templates.
+
+[[rules]]
+id = "aws-secret-key-labelled"
+description = "An AWS secret access key after its label: `aws configure`'s prompt (`AWS Secret Access Key [None]: ...`) or a note (`Secret access key: ...`, `iam-secret is ...`). Forty characters mixing upper case, lower case and digits."
+regex = '''(?i)(?:secret[ _-]?access[ _-]?key|(?:aws|iam)[ _-]?secret(?:[ _-]?key)?)(?:[ \t]*\[[^\]\n]{0,40}\])?[ \t]*(?::=|=>|->|[:=-]|\bis\b)[ \t]*["'`]?((?=[A-Za-z0-9/+]{0,39}[A-Z])(?=[A-Za-z0-9/+]{0,39}[a-z])(?=[A-Za-z0-9/+]{0,39}[0-9])[A-Za-z0-9/+]{40})(?![A-Za-z0-9/+=])'''
+keywords = ["secret"]
+[[rules.allowlists]]
+regexes = ['''(?i)example''']
+
+[[rules]]
+id = "connection-string-password"
+description = "A password in a database connection string (ADO.NET, ODBC, JDBC): `Server=...;User Id=...;Password=...;`. The line must name a server, database or user in the same `key=value;` form."
+regex = '''(?im)^(?=[^\n]{0,2000}?\b(?:server|data source|host|hostname|address|database|initial catalog|user id|userid|uid|username|user)[ \t]*=[ \t]*[^;"'\s][^;"'\n]{0,199};)[^\n]{0,2000}?(?:^|[;"'\s])(?:password|pwd)[ \t]*=[ \t]*([^;"'\s{][^;"'\n]{1,126}[^;"'\s])[ \t]*(?:;|"|'|$)'''
+keywords = ["password", "pwd"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|pwd|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder|your[_ -]?pass''',
+    '''^<[^>]*>$''',
+    '''^\$''',  # $VAR, ${VAR}, $(command)
+    '''^%[\w.]+%$''',
+    '''^@\w+$''',  # a SQL parameter
+    '''^\{\{?.*\}\}?$''',
+    '''\*{3,}''',  # masked: `password=****`
+    '''^(?:/|~/|\./|[A-Za-z]:\\)''',  # a path: sudo logs write `PWD=/srv ; USER=root ;`
+    '''#\{''',  # a template: #{DbPassword}
+    '''^__\w+__$''',  # a token to replace: __DB_PASSWORD__
+    '''^:\w+$''',  # a bind variable: :db_password
+    '''^%\(\w+\)s$''',  # a Python format: %(db_password)s
+    '''(?i)^your[_ -]?strong''',  # documentation's sample: yourStrong(!)Password
+    '''^[a-z]+(?:-[a-z]+)+$''',  # words, not a password: see-vault-entry
+]
+
+[[rules]]
+id = "libpq-password"
+description = "A password in a PostgreSQL (libpq) connection string, space-separated: `host=... dbname=... user=... password=...`."
+regex = '''(?im)^(?=[^\n]{0,1000}?\b(?:host|hostaddr|dbname)=[^\s'"]{1,200})[^\n]{0,1000}?(?:^|[\s'"])password=([^\s'";]{3,128})(?=[\s'";]|$)'''
+keywords = ["password="]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|pwd|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder|your[_ -]?pass''',
+    '''^<[^>]*>$''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''\*{3,}''',
+    '''^(?:/|~/|\./)''',
+    '''#\{''',
+    '''^__\w+__$''',
+    '''^:\w+$''',
+    '''^%\(?\w+\)?s?$''',
+    '''^[a-z]+(?:-[a-z]+)+$''',  # words, not a password: see-vault-entry
+]
+
+[[rules]]
+id = "password-assignment-exported"
+description = "A password given to an environment variable by a shell or Dockerfile: `export DB_PASSWORD=...`, `setenv PASSPHRASE ...`, `ENV SMTP_PASSWORD=...`. The value must mix letters with digits or symbols; a comment or another command may follow."
+regex = '''(?im)^[ \t]*(?:export|setenv|declare[ \t]+-x|typeset[ \t]+-x|ENV|ARG)[ \t]+[\w.-]{0,40}(?:passw(?:or)?d|pwd|passphrase)[\w.-]{0,40}(?:[ \t]*=[ \t]*|[ \t]+)["']?((?=[^\s"'`]*[A-Za-z])(?=[^\s"'`]*[0-9!@#$%^&*+=?~])[^\s"'`]{6,128})["']?(?:[ \t]+(?:#|;|&&|\|\|)[^\n]*)?[ \t]*$'''
+keywords = ["passw", "pwd", "passphrase"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder''',
+    '''^<[^>]*>$''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^(?:/|~/|\./)''',  # a path to a file holding the password
+]
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i)[_.-](?:hash|algo|algorithm|file|path|dir|url|uri|name|type|length|len|policy|min|max|rounds|cost|image|manager|tag|version|host|port|user|username|mode)(?:[ \t]*=[ \t]*|[ \t]+)["']?[^\s"'`]+''',  # the name's last part
+]
+
+[[rules]]
+id = "wifi-passphrase"
+description = "A Wi-Fi passphrase or raw key in wpa_supplicant, hostapd, NetworkManager or Debian interfaces files: `psk=\"...\"`, `wpa_passphrase=...`, `wpa-psk ...` (8 to 63 characters, or 64 hex digits)."
+regex = '''(?im)^[ \t]*(?:(?:psk|wpa_passphrase|sae_password)[ \t]*=[ \t]*(?:"([^"\n]{8,63})"|([0-9a-fA-F]{64}|[^"\s]{8,63}|(?=[^\n]*[0-9!@#$%^&*+=?~])[^"\s][^\n]{6,61}[^\s"]))|wpa-psk[ \t]+(?:"([^"\n]{8,63})"|([0-9a-fA-F]{64}|[^"\s]{8,63})))[ \t]*$'''
+keywords = ["psk", "passphrase", "sae_password"]
+[[rules.allowlists]]
+regexes = ['''(?i)example|placeholder|changeme|your[_ -]|<[^>]*>''', '''^\$''', '''^\{\{?.*\}\}?$''', '''^@''']
+
+[[rules]]
+id = "cloud-init-chpasswd"
+description = "A password in cloud-init's `chpasswd: list: |` block (`user:password`), the first user's."
+regex = '''(?m)^[ \t]*chpasswd:[ \t]*\r?\n(?:[ \t][^\n]*\n){0,4}?[ \t]+list:[ \t]*[|>][-+]?[ \t]*\r?\n[ \t]+[a-z_][a-z0-9_.-]{0,31}:((?=\S*[0-9!@#$%^&*+=?~_-])[^\s:]{6,128})[ \t]*\r?$'''
+keywords = ["chpasswd"]
+[[rules.allowlists]]
+regexes = ['''(?i)^(?:random|r|rand)$''', '''(?i)example|placeholder|changeme''', '''^\$''']
+
+[[rules]]
+id = "xml-name-value-secret"
+description = "An XML setting whose name says secret, password, token, API key or credential, with the value in an attribute: `<env name=\"DB_PW\" value=\"...\"/>` (IDE run configurations), `<add key=\"ApiKey\" value=\"...\"/>` (.NET), `<property name=\"password\" value=\"...\"/>`."
+regex = '''(?i)<[\w:.-]{1,40}\s[^<>]{0,200}?\b(?:name|key)\s*=\s*"(?:[\w.:-]{0,60}?(?:secret|passw(?:or)?d|passphrase|pwd|token(?!iz|is)|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credential|cred(?:s)?(?![a-z]))[\w.:-]{0,60}|(?:[\w.:-]{0,60}[^a-z])?(?:pw|pass|auth|oauth)(?:[^a-z][\w.:-]{0,60})?)"[^<>]{0,200}?\bvalue\s*=\s*"((?=[^"]*[0-9!@#$%^&*+=?~_])[^"\s<>]{8,512})"'''
+keywords = ["value"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret|test(?:ing)?|dummy|redacted|none|null|undefined|true|false|xxx+|\*+|\.+|\d+)$''',
+    '''(?i)example|placeholder|your[_-]''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^%[\w.]+%$''',
+    '''^@''',  # a resource reference: @string/api_key
+    '''^[a-z][a-z0-9+.-]*://[^@\s]*$''',  # a URL without credentials, any scheme
+    '''^(?:/|~/|\./|\.\./|[A-Za-z]:\\)''',  # a path
+    '''^(?:[a-z0-9_.-]+/)+[a-z0-9_.-]+/?$''',  # a lower-case relative path: build/tmp_cache
+    '''(?i)^[\w.-]+\.(?:xml|json|pem|key|p12|pfx|jks|keystore|crt|cer|txt|log|properties|ya?ml)$''',  # a file name
+    '''^[A-Za-z][A-Za-z0-9]*(?:[._][A-Za-z0-9]+)+$''',  # a dotted or snake_case name
+    '''^v?\d+(?:\.\d+)+(?:[-+][\w.]+)?$''',  # a version: 2.0.1-beta
+    '''(?i)^(?:iso|utf|us-ascii|windows|latin)-?\d''',  # an encoding: ISO-8859-1
+]
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i)\b(?:name|key)\s*=\s*"[^"]*(?:id|ids|name|path|url|uri|file|dir|folder|type|version|encoding|charset|format|mode|length|policy|hint|label|title|text|header|endpoint|scope|provider|store|location|timeout|ttl|expiry|enabled|required|algorithm|alg)"''',
+]
+
+[[rules]]
+id = "xml-named-secret-text"
+description = "An XML element whose name attribute says secret, password, token, API key or credential, with the value as its text: Android `<string name=\"partner_cred\">...</string>`, Java properties XML `<entry key=\"password\">...</entry>`. The value has no spaces and holds a digit."
+regex = '''(?i)<(?:string|entry|item|property|value|setting|add|param|parameter)\b[^<>]{0,200}?\b(?:name|key)\s*=\s*"(?:[\w.:-]{0,60}?(?:secret|passw(?:or)?d|passphrase|pwd|token(?!iz|is)|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credential|cred(?:s)?(?![a-z]))[\w.:-]{0,60}|(?:[\w.:-]{0,60}[^a-z])?(?:pw|pass|auth|oauth)(?:[^a-z][\w.:-]{0,60})?)"[^<>]{0,200}>[ \t]*((?=[^<\s]*[0-9])[A-Za-z0-9_.+/=:!@#$%^&*?~-]{10,512})[ \t]*</'''
+keywords = ["name=", "key="]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)example|placeholder|changeme|your[_-]''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^@''',
+    '''^[a-z][a-z0-9+.-]*://[^@\s]*$''',
+    '''^(?:/|~/|\./|\.\./|[A-Za-z]:\\)''',
+    '''^(?:[a-z0-9_.-]+/)+[a-z0-9_.-]+/?$''',
+    '''(?i)^[\w.-]+\.(?:xml|json|pem|key|p12|pfx|jks|keystore|crt|cer|txt|log|properties|ya?ml)$''',
+    '''^\d+(?:\.\d+)*$''',  # a number or a version
+    '''^v?\d+(?:\.\d+)+(?:[-+][\w.]+)?$''',
+    '''^[A-Za-z][A-Za-z0-9]*(?:[._][A-Za-z0-9]+)+$''',
+    '''(?i)^(?:iso|utf|us-ascii|windows|latin)-?\d''',
+    '''(?i)^(?:ctrl|alt|shift|cmd|command|meta|option|super)\+''',  # a keyboard shortcut
+]
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i)\b(?:name|key)\s*=\s*"[^"]*(?:id|ids|name|path|url|uri|file|dir|folder|type|version|encoding|charset|format|mode|length|policy|hint|label|title|text|header|endpoint|scope|provider|store|location|timeout|ttl|expiry|enabled|required|algorithm|alg)"''',
+]
+
+[[rules]]
+id = "latex-secret-macro"
+description = "A LaTeX macro whose name ends in Token, Secret, Password, ApiKey or Credential, defined as a value without spaces holding a digit: `\\newcommand{\\bearerToken}{...}`, `\\def\\apiSecret{...}`."
+regex = '''(?:\\(?:(?:re)?newcommand|providecommand)\*?\s*\{?\\[A-Za-z]*(?i:token|secret|password|passwd|apikey|credential)\}?(?:\[\d\])?\s*|\\def\\[A-Za-z]*(?i:token|secret|password|passwd|apikey|credential))\{((?=[^{}\s]*\d)[^{}\s\\]{12,512})\}'''
+keywords = ["newcommand", "providecommand", "\\def"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)example|placeholder|changeme''',
+    '''^[a-z][a-z0-9+.-]*://''',  # a URL
+    '''^(?:/|\./|~/)''',
+    '''^[\d.,]+$''',  # a number: 1,000,000
+    '''^10\.\d{4,}/''',  # a DOI
+    '''^\d{4}\.\d{4,5}(?:v\d+)?$''',  # an arXiv id
+    '''^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$''',  # an ORCID
+    '''(?i)\.(?:png|jpe?g|pdf|eps|svg|tex|bib)$''',  # a file
+]
+
+[[rules]]
+id = "helm-literal-b64enc"
+description = "A literal string base64-encoded by a Helm template, as a Secret's value: `db-pass: {{ \"...\" | b64enc }}` (optionally `| quote`). The value holds a letter, and a digit or a symbol other than `-`, `_` and `.`."
+regex = '''\{\{-?\s*"((?=[^"\s]*[A-Za-z])(?=[^"\s]*[0-9!@#$%^&*+=?~/])[^"\s\\]{6,256})"\s*\|\s*b64enc\s*(?:\|\s*quote\s*)?-?\}\}'''
+keywords = ["b64enc"]
+[[rules.allowlists]]
+regexes = ['''(?i)example|placeholder|changeme''', '''^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$''']  # a release or resource name: my-release-2
+
+[[rules]]
+id = "secret-named-assignment"
+description = "A quoted value given to a name whose part says pass, pw, pwd, secret, cred, credential or token, in code or configuration, with or without a type: `const LOGIN_SECRET: &str = \"...\"`, `svcPass: '...'`, `partnerCred = \"...\"`, `{'pw': '...'}`. The value mixes letters with digits or symbols. Names ending in Name, Ref, Path, Url, Id and the like are not secrets."
+regex = '''(?<![\w.$-])[\w.$-]{0,40}?(?:(?<![A-Za-z0-9])(?i:pass(?:wd|word)?|pw|pwd|secret|cred|creds|credentials?|token)(?![a-z])|(?<=[a-z0-9])(?:Pass(?:wd|word)?|Pw|Pwd|Secret|Cred|Creds|Credentials?|Token)(?![a-z]))[\w.$-]{0,40}["'\]]?(?:[ \t]*:[ \t]*&?(?:'static[ \t]+)?[A-Za-z_][\w<>\[\]:.]{0,40}(?=[ \t]*=))?[ \t]*(?:=>|:=|\?=|\|\|=|=|:)[ \t]*["'`]((?=[^"'`\s\\]*[A-Za-z])(?=[^"'`\s\\]*[0-9!@#$%^&*+=?~_.-])[^"'`\s\\]{8,256})["'`]'''
+keywords = ["pass", "pw", "secret", "cred", "token"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret\d*|test(?:ing)?\d*|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder|changeme|your[_-]|replace[_-]?me|<[^>]*>''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^%\(?\w+\)?s?%?$''',
+    '''#\{''',  # Ruby interpolation: "wrong-#{password}"
+    '''^@''',
+    '''^\d{4}-\d{2}-\d{2}''',  # a date or a timestamp
+    '''^(?:[A-Za-z]+:)?//[^@\s]*$''',  # a URL without credentials
+    '''^(?:https?|wss?|s3|gs|file)://[^@\s]*$''',
+    '''^(?:/|~/|\./|\.\./|[A-Za-z]:\\)''',  # a path
+    '''^[a-z][a-z0-9]*(?:[-_.:/]+[a-z0-9]+)+$''',  # a lower-case name: my-app-secret, hf_oauth__x
+    '''…|\.\.\.''',  # elided: hf_jwt_…
+    '''%[-+0 #]*\d*(?:\.\d+)?[sdifxXr]''',  # a format string: '%d.%d.%d'
+    '''^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$''',  # a constant's name
+    '''^[a-z]+(?:[A-Z][a-z0-9]+)+$''',  # a camelCase identifier
+    '''(?i)^[\w.-]+\.(?:json|ya?ml|pem|key|p12|pfx|jks|crt|cer|txt|env|properties|conf|cfg|ini|toml)$''',
+    '''(?i)^(?:v?\d+(?:\.\d+)+|\d+(?:ms|s|m|h|d|kb|mb|gb|px|%)?)$''',
+    '''(?i)^(?:true|false|yes|no|on|off|bearer|basic)$''',
+    '''^arn:''',  # an AWS resource name
+    '''^X-[A-Za-z0-9-]+$''',  # a header name: X-Amz-Security-Token
+    '''^[A-Z][a-z]+(?:-[A-Z][a-z]+)+$''',  # a header name: Proxy-Authorization
+    '''^[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)+$''',  # a dotted name: Auth.TokenRefreshed
+    '''^[A-Z][a-z]+(?:_[A-Z][a-z]+)+(?:_v?\d+)?$''',  # Token_Cache_v2
+    '''^\[[A-Z_]+\]$''',  # a tokenizer's special: [IMG_BREAK]
+    '''^__\w+__$''',
+    '''\(''',  # a call: `get_token()`
+    '''^[A-Z][A-Z0-9_]*=''',  # an assignment described in prose: `PASSWORD_FILE=/run/...`
+]
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i)(?:page|next|continuation|sync|cursor|pagination|resume|refresh_?page)[_-]?token''',  # a page cursor
+    '''(?i)(?:Load|Set|Import)Credential(?:Encrypted)?[ \t]*=''',  # systemd: a name and a path
+    '''(?i)(?:name|ref|path|file|dir|url|uri|id|ids|type|len(?:gth)?|policy|hint|prompt|label|text|title|message|msg|field|header|env|var|mode|format|count|ttl|expir(?:y|es|ation)|endpoint|scope|kind|size|regex|pattern|enabled|required|hash|salt|algorithm|algo|digest|cipher|version|prefix|suffix|template|placeholder|provider|store|manager|service|location|limit|timeout|class|storage|_at|_on|date|time|changed|updated|created|attempts)["'\]]?(?:[ \t]*:[ \t]*&?(?:'static[ \t]+)?[A-Za-z_][\w<>\[\]:.]{0,40}(?=[ \t]*=))?[ \t]*(?:=>|:=|\?=|\|\|=|=|:)[ \t]*["'`]''',
+]
+
+[[rules]]
+id = "secret-named-assignment-unquoted"
+description = "An unquoted value at the start of a line, given to a name whose part says pass, pw, pwd, secret, cred, credential or token (properties, .env, INI): `systemProp.creds=...`, `DB_PASS=...`. The value mixes letters with digits or symbols."
+regex = '''(?m)^[ \t]*(?:export[ \t]+)?[\w.$-]{0,40}(?:(?<![A-Za-z0-9])(?i:pass(?:wd|word)?|pw|pwd|secret|cred|creds|credentials?|token)(?![a-z])|(?<=[a-z0-9])(?:Pass(?:wd|word)?|Pw|Pwd|Secret|Cred|Creds|Credentials?|Token)(?![a-z]))[\w.$-]{0,40}[ \t]*[=:][ \t]*((?=[^\s#;"'`,]*[A-Za-z])(?=[^\s#;"'`,]*[0-9!@#$%^&*+=?~_.-])[^\s#;"'`,]{8,256})[ \t]*$'''
+keywords = ["pass", "pw", "secret", "cred", "token"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)^(?:password\d*|passw(?:or)?d|changeme|example|placeholder|secret\d*|test(?:ing)?\d*|dummy|redacted|none|null|undefined|xxx+|\*+|\.+)$''',
+    '''(?i)example|placeholder|changeme|your[_-]|replace[_-]?me|<[^>]*>''',
+    '''^\$''',
+    '''^\{\{?.*\}\}?$''',
+    '''^%\(?\w+\)?s?%?$''',
+    '''^@''',
+    '''^(?:https?|wss?|s3|gs|file)://[^@\s]*$''',
+    '''^(?:/|~/|\./|\.\./|[A-Za-z]:\\)''',
+    '''^[a-z][a-z0-9]*(?:[-_.:/][a-z0-9]+)+$''',
+    '''^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$''',
+    '''^[a-z]+(?:[A-Z][a-z0-9]+)+$''',
+    '''(?i)^[\w.-]+\.(?:json|ya?ml|pem|key|p12|pfx|jks|crt|cer|txt|env|properties|conf|cfg|ini|toml)$''',
+    '''(?i)^(?:v?\d+(?:\.\d+)+|\d+(?:ms|s|m|h|d|kb|mb|gb|px|%)?)$''',
+    '''(?i)^(?:true|false|yes|no|on|off)$''',
+    '''[()]''',  # code: `pw = strings.TrimSpace(string(b))`
+    '''^\d{4}-\d{2}-\d{2}''',
+    '''^[\w.-]+:/''',  # a name and a path: systemd `LoadCredential=db-password:/etc/...`
+    '''^[A-Za-z_][\w.]*\[[\w"'.+-]*\]$''',  # an index into a name: parts[1], self.tokens[i]
+]
+[[rules.allowlists]]
+paths = ['''(?i)\.(?:py|pyi|js|mjs|cjs|jsx|ts|tsx|go|rb|java|kt|kts|scala|rs|c|h|cc|cpp|hpp|cs|php|swift|m|mm|dart|lua|pl|r|jl|ex|exs|clj|hs|ml|fs|vb)$''']  # code: assignments are code, quoted secrets have their own rules
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+    '''(?i)(?:page|next|continuation|sync|cursor|pagination|resume|refresh_?page)[_-]?token''',  # a page cursor
+    '''(?i)(?:Load|Set|Import)Credential(?:Encrypted)?[ \t]*=''',  # systemd: a name and a path
+    '''(?i)(?:name|ref|path|file|dir|url|uri|id|ids|type|len(?:gth)?|policy|hint|prompt|label|text|title|message|msg|field|header|env|var|mode|format|count|ttl|alg|source|backend|engine|driver|strategy|method|scheme|cache|expir(?:y|es|ation)|endpoint|scope|kind|size|regex|pattern|enabled|required|hash|salt|algorithm|algo|digest|cipher|version|prefix|suffix|template|provider|store|manager|service|location|limit|timeout|class|storage|_at|_on|date|time|changed|updated|created|attempts)[ \t]*[=:]''',
+]
+
+[[rules]]
+id = "filezilla-password"
+description = "A saved password in FileZilla's sitemanager.xml or recentservers.xml: `<Pass encoding=\"base64\">...</Pass>` (or plain `<Pass>...</Pass>` in old versions)."
+regex = '''<Pass(?:\s+encoding="base64")?>([^<\s]{3,512})</Pass>'''
+path = '''(?i)(?:filezilla|sitemanager|recentservers)'''
+keywords = ["<pass"]
+

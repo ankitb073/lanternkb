@@ -1,0 +1,20 @@
+[project]
+name = "lanternkb-epub"
+version = "0.1.0"
+description = "Example lanternkb plugin: EPUB books as a feature (extractor.epub)."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+authors = [{ name = "ankitb073" }]
+dependencies = []  # lanternkb is the host it is installed into
+
+# This line is the whole registration: lanternkb finds the plugin through it.
+[project.entry-points."lanternkb.features"]
+epub = "lanternkb_epub:create"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lanternkb_epub"]
+

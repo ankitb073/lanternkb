@@ -1,0 +1,75 @@
+# Publishes lanternkb and lanternkb-ui to PyPI when a version tag (v0.1.1) is pushed. Trusted publishing:
+# no token is stored. PyPI trusts this workflow in the `pypi` environment for lanternkb and in `pypi-ui` for
+# lanternkb-ui. A manual run builds and checks without publishing.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:  # a dry run: build and check, never publish (`gh workflow run release.yml`)
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - name: The tag matches every version
+        if: github.ref_type == 'tag'
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          grep -qx "version = \"$v\"" pyproject.toml
+          grep -qx "version = \"$v\"" packages/lanternkb-ui/pyproject.toml
+          grep -qx "__version__ = \"$v\"" src/lanternkb/__init__.py
+          grep -q "\"lanternkb-ui==$v\"" pyproject.toml
+          grep -q "\"lanternkb==$v\"" packages/lanternkb-ui/pyproject.toml
+      - name: The wheel ships nothing it should not
+        if: hashFiles('scripts/check_wheel.py') != ''
+        run: uv run --no-project --python 3.12 python scripts/check_wheel.py  # standard library only
+      - run: uv build --package lanternkb --out-dir dist/lanternkb
+      - run: uv build --package lanternkb-ui --out-dir dist/lanternkb-ui
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: lanternkb
+          path: dist/lanternkb/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: lanternkb-ui
+          path: dist/lanternkb-ui/
+          if-no-files-found: error
+
+  publish-lanternkb:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: lanternkb
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+
+  # After lanternkb, which it pins: never a settings page on PyPI without the version it needs.
+  publish-lanternkb-ui:
+    needs: publish-lanternkb
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi-ui
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: lanternkb-ui
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2

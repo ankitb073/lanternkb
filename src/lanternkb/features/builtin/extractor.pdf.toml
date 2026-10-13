@@ -1,0 +1,22 @@
+[feature]
+id = "extractor.pdf"
+title = "PDF"
+category = "documents"
+kind = "extractor"
+api_version = 1
+default_enabled = true
+default_tier = "open"           # the root's tier decides; this does not restrict further
+description = "PDF files with a text layer, one result location per page. Scanned pages need OCR."
+
+[capabilities]
+reads = ["PDF files inside approved roots"]
+network = false
+os_permissions = []
+
+[limits]
+cpu_seconds = 60
+memory_mb = 1024
+output_mb = 20
+
+[handles]
+suffixes = [".pdf"]

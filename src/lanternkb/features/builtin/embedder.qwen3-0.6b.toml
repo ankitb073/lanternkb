@@ -1,0 +1,14 @@
+[feature]
+id = "embedder.qwen3-0.6b"
+title = "Semantic search: Qwen3 Embedding 0.6B"
+category = "search"
+kind = "embedder"
+api_version = 1
+default_enabled = false
+default_tier = "open"           # vectors take the tier of the file they came from
+description = "Finds text by meaning as well as by words. Qwen/Qwen3-Embedding-0.6B, Apache-2.0. 1,024 dimensions, about 1.2 GB. Runs on this machine; the model is fetched once with `lanternkb models pull embed:qwen3-0.6b`."
+
+[capabilities]
+reads = ["the redacted text of indexed chunks, in memory only"]
+network = false
+os_permissions = []
