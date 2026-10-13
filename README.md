@@ -30,12 +30,25 @@ lanternkb ui           # the settings page, with a search box
 lanternkb doctor       # checks the setup and says what to fix
 ```
 
-## Use it from Claude Code
+## Use it from your AI tools
+
+**Claude Code:**
 
 1. `lanternkb mcp-setup` prints a `claude mcp add` command. Run it.
 2. The server it registers returns files from folders you marked open, and nothing else.
 3. Claude Code can also read files with its own tools, so `mcp-setup` prints deny rules too. Add them to
    `~/.claude/settings.json` to keep its tools away from your local-only folders and the index.
+
+**Codex, Cursor, VS Code, Gemini CLI and any other MCP client:** run `lanternkb serve --tier open` as a stdio
+server. For Codex, in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.lanternkb]
+command = "lanternkb"
+args = ["serve", "--tier", "open"]
+```
+
+The [user guide](docs/guide.md#other-mcp-clients) has the JSON form the other clients take, and what to watch for.
 
 ## What it reads
 

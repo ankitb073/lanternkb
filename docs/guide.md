@@ -45,6 +45,32 @@ The server starts when Claude Code needs it and stops with it: there is no daemo
 
 Every result says it is untrusted data, so instructions inside your files are not followed as commands. In a test, Claude followed none of 129 planted instructions.
 
+## Other MCP clients
+
+lanternkb is a standard MCP server over stdio, so Codex, Cursor, VS Code, Gemini CLI, Windsurf, Claude Desktop and
+local-model apps such as LM Studio can use it too. `lanternkb mcp-setup` prints the full path of the `lanternkb`
+command; use it in place of `lanternkb` below, since an app started from the Dock may not see your shell's PATH.
+
+Codex, in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.lanternkb]
+command = "lanternkb"
+args = ["serve", "--tier", "open"]
+```
+
+Cursor, Gemini CLI, Windsurf and Claude Desktop take the same entry as JSON in their MCP settings (VS Code's
+`.vscode/mcp.json` names the key `servers`):
+
+```json
+{ "mcpServers": { "lanternkb": { "command": "lanternkb", "args": ["serve", "--tier", "open"] } } }
+```
+
+Give an assistant that sends results to the cloud the `open` server. The `all` server also returns local-only
+files, so it refuses clients that name themselves as cloud assistants (Codex, Cursor, Copilot, Gemini and others):
+use it only with a model that runs on this machine. The deny rules `mcp-setup` prints are for Claude Code; with
+other tools, use their own permission settings to keep them out of your local-only folders.
+
 ## Search
 
 ```sh

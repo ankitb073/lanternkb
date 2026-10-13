@@ -1,4 +1,4 @@
-# Publishes lanternkb and lanternkb-ui to PyPI when a version tag (v0.1.1) is pushed. Trusted publishing:
+# Publishes lanternkb and lanternkb-ui to PyPI when a version tag (v0.1.2) is pushed. Trusted publishing:
 # no token is stored. PyPI trusts this workflow in the `pypi` environment for lanternkb and in `pypi-ui` for
 # lanternkb-ui. A manual run builds and checks without publishing.
 name: release
